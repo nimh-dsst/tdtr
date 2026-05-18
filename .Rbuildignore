@@ -1,0 +1,10 @@
+^\.git$
+^\.gitignore$
+^\.lintr$
+^\.pixi$
+^\.pixi/
+^pixi\.lock$
+^pixi\.toml$
+^README\.Rmd$
+^scripts$
+^tdtR\.Rproj$
