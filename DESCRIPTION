@@ -1,15 +1,13 @@
-Package: tdtR
+Package: tdtr
 Title: Read and Export Tucker-Davis Technologies Data from R
 Version: 0.0.0.9000
 Authors@R: c(
     person("John", "Lee", email = "johnleenimh@gmail.com", role = c("aut", "cre"))
   )
-Description: Provides a small R interface for reading Tucker-Davis Technologies
-    (TDT) tank/block data through the Python 'tdt' package, formatting stream
-    data for downstream analysis, and writing per-subject extraction metadata
-    and stream exports. The package is intended for local and institutional use
-    first, with package structure and checks kept close to CRAN and Bioconductor
-    expectations.
+Description: Provides an R interface for reading Tucker-Davis Technologies
+    (TDT) tank/block data through the Python 'tdt' package with reticulate,
+    including Python-backed wrappers and explicit helpers for collecting data
+    into ordinary R objects for downstream analysis.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

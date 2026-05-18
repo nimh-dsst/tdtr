@@ -19,6 +19,6 @@ A data frame with block/event metadata and columns \code{D0} through
 \verb{D\{num_of_points - 1\}}.
 }
 \description{
-Converts a single-channel TDT stream into the row-wise format used by the
-ArchiveFlow photometry extraction workflow.
+Converts a single-channel TDT stream into a row-wise data frame for downstream
+analysis.
 }

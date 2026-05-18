@@ -1,4 +1,4 @@
-# tdtR 0.0.0.9000
+# tdtr 0.0.0.9000
 
 * Initial standalone package scaffold.
 * Adds R wrappers for Python `tdt.read_block()`, TDT tank-name parsing,

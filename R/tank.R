@@ -1,6 +1,6 @@
 #' Parse metadata from a TDT tank directory name
 #'
-#' Parses tank names used by the ArchiveFlow photometry workflow, for example
+#' Parses tank names that follow a subject-date-time convention, for example
 #' `12_M1-250103-001644`, `12_M1_2-250103-001644`, and
 #' `12_M1_F2-250103-001644`.
 #'

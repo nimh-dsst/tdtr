@@ -1,5 +1,5 @@
 source_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
-temp_parent <- tempfile("tdtR-check-")
+temp_parent <- tempfile("tdtr-check-")
 dir.create(temp_parent, recursive = TRUE)
 on.exit(unlink(temp_parent, recursive = TRUE), add = TRUE)
 

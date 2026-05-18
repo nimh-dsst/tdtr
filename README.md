@@ -1,18 +1,27 @@
-# tdtR
+# tdtr
 
-`tdtR` is a standalone R package for working with Tucker-Davis Technologies
-(TDT) tank/block data. It wraps the Python `tdt` package through `reticulate`,
-formats stream data into analysis-ready data frames, and writes per-subject
-stream exports with metadata.
+`tdtr` is a standalone R package for working with Tucker-Davis Technologies
+(TDT) tank/block data from R. It uses Python's `tdt` package through
+`reticulate`, with a layered interface:
 
-This package started from the TDT extraction work in the ArchiveFlow prototypes.
-The reusable code has been pulled into package functions; Shiny and Streamlit UI
-code is kept out of scope.
+- Python-backed wrappers for large-data workflows where unwanted array copies
+  matter;
+- R-friendly accessors, summaries, and event/window helpers;
+- explicit collection helpers that materialize streams, epocs/events, and
+  metadata into ordinary R objects.
+
+The current scope is documented in [docs/package-scoping.md](docs/package-scoping.md).
+Lab-specific extraction workflows are out of scope for the core package.
 
 ## Install dependencies
 
-The package uses `reticulate` to call Python's `tdt` package. In a local Python
-environment, install:
+This phase of the package requires R, `reticulate`, Python, and Python's `tdt`
+package. The package should follow reticulate's package guidance: declare
+`tdt>=0.7.3` with `py_require()`, delay-load Python imports, and fail clearly
+when Python-backed functionality is used without a working Python `tdt`
+installation.
+
+In a local Python environment, install:
 
 ```sh
 python -m pip install tdt
@@ -29,26 +38,15 @@ pixi run check
 ## Basic use
 
 ```r
-library(tdtR)
+library(tdtr)
 
-block <- tdt_read_block("/path/to/TDT/block")
-tdt_stream_names(block)
+block <- read_block("/path/to/TDT/block")
+stream_names(block)
 
-info <- tdt_parse_tank_name("/data/123_M1_2-250103-001644")
-info$subject_ids
+events <- collect_epocs(block)
+signal <- collect_stream(block, "Wav1")
 ```
 
-For a known stream mapping:
-
-```r
-stream_map <- list(
-  First = list(ttl_stream = "Wav1", iso_stream = "_405A", exp_stream = "_470D"),
-  Second = list(ttl_stream = "Wav1", iso_stream = "_45bA", exp_stream = "_47bD")
-)
-
-tdt_extract_tank(
-  tank_dir = "/path/to/TDT/block",
-  output_dir = "/path/to/Analysis",
-  stream_map = stream_map
-)
-```
+The implementation is being realigned around generic TDT functionality. Lab-
+specific extraction workflows, Synapse API work, and native R binary parsing are
+out of scope.

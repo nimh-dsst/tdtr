@@ -1,212 +1,193 @@
-# Package scoping: R package for TDT fiber photometry workflows
+# Package Scoping: tdtr
 
-Working package name: **`tdtr`**  
-Optional bridge package name: **`tdtrpy`**
+Working package name: **`tdtr`**
 
-This document records the current scoping decisions for an R-first package that helps scientists work with TDT fiber photometry data without committing the core package to Python, reticulate, or a homegrown binary parser.
+This document records the current scope for `tdtr`: an R package that gives
+scientists a clean R interface for working with Tucker-Davis Technologies (TDT)
+tank/block data while avoiding a high-maintenance native R binary parser.
 
-## Decision snapshot
+## Decision Snapshot
 
-Build a **pure-R core package** first.
+Build a **single R package** with:
 
-The core package should focus on:
+- Python `tdt`/`reticulate` as the practical raw TDT backend for the
+  foreseeable future;
+- an explicit Python-backed compatibility layer for users who need control over
+  large data and reticulate conversion behavior;
+- R-friendly accessors, summaries, and collection helpers layered on top of
+  Python-backed objects;
+- ordinary R objects for materialized streams, epocs/events, metadata, and
+  bounded table views;
+- event-aligned, trial-aligned, and windowed analysis helpers for downstream R
+  workflows;
+- simple importers for exported CSV/binary data;
+- a small dependency footprint where feasible.
 
-- a stable R data model for TDT-style continuous streams and event/epoc data;
-- R-native helpers for event-aligned, trial-aligned, and windowed photometry workflows;
-- importers for simple/exported data formats that laboratories can generate from TDT, MATLAB, or Python;
-- a small dependency footprint that keeps the package plausible for CRAN and, later, possibly Bioconductor.
+Do **not** implement full TDT binary parsing in R unless the project scope
+changes substantially.
 
-Do **not** make the first package a public reticulate wrapper around the Python `tdt` package.
+Do **not** add Synapse HTTP/API client work, UDP interfaces, live acquisition,
+or lab-specific extraction workflows to the core package.
 
-Reticulate remains a useful fallback, but it should be treated as an **optional import backend**, ideally in a separate package, and should return pure R objects rather than live Python pointers.
+## Naming
 
-## Why this scope changed
+Use `tdtr`.
 
-The earlier plan centered on reticulate-backed wrappers for:
+The all-lowercase name is easier to type, works cleanly in URLs and filesystem
+paths, and follows common modern R package conventions.
 
-- `tdt.read_block()`
-- `tdt.read_sev()`
-- `tdt.epoc_filter()`
-
-That made sense for quickly exposing existing Python functionality. However, it would also make the package conceptually dependent on Python objects, Python environments, NumPy array conversion, and non-persistent external pointers.
-
-The new goal is different:
-
-> Make a durable R package that can evolve toward a clean release on CRAN or Bioconductor without being irrevocably tied to a Python-centered public interface.
-
-The core package should be useful even when users arrive with data exported from MATLAB, Python, Synapse/OpenScope tooling, or a future compiled reader.
-
-## Scientific premise
-
-Most fiber photometry users do **not** need full parity with every low-level TDT binary reader option.
-
-They usually need clean ways to:
-
-- represent continuous photometry streams;
-- represent events, TTLs, stimulation epochs, notes, behavioral state changes, and trial metadata;
-- align continuous streams to events;
-- extract peri-event windows;
-- compute trial-level or condition-level summaries;
-- move from raw or exported TDT data into a reproducible R analysis workflow.
-
-This package should lead with those workflows.
-
-## Core principles
-
-### 1. Stable R objects first
-
-The package should define ordinary R objects that can be inspected, saved, restored, tested, and passed through common R workflows.
-
-Preferred structures:
-
-- `list`
-- `matrix`
-- `numeric`
-- `data.frame` / `tibble`
-- S3 classes
-
-Avoid using live foreign-language pointers as public objects in the core package.
-
-### 2. Importers return pure R
-
-Any importer, whether native R, compiled-code backed, or Python-backed, should return the same R class:
+Use clean public function names. Normal use will look like:
 
 ```r
-class(block) == c("tdt_block", "list")
+tdtr::read_block()
+tdtr::stream_names()
+tdtr::epocs()
+tdtr::collect_stream()
 ```
 
-Not:
+The package namespace is enough to avoid ambiguity; do not make every R-facing
+function name cumbersome solely to repeat `tdt`.
+
+For direct Python-compatibility wrappers, prefer names that make the return type
+obvious. If a high-level R helper and a Python-parity wrapper would otherwise
+share a name, use a `_py` suffix for the Python-backed wrapper:
 
 ```r
-class(block) == "tdt_block_py"
+read_block()
+read_block_py()
+read_sev_py()
+epoc_filter_py()
 ```
 
-The user should not need to know whether the import came from a CSV export, MATLAB export, Python bridge, or future compiled reader.
+If a Python `tdt` function can be exposed directly without creating ambiguity,
+matching the Python function name is acceptable.
 
-### 3. No homegrown full binary parser
+## Public Interface Philosophy
 
-Do **not** implement a native R parser for the full TDT block ecosystem.
+The public API should be layered. It should let an R user work productively
+without learning reticulate internals, while still letting Python/R developers
+avoid unnecessary NumPy-to-R copies and build pipelines that keep large arrays
+in Python until they intentionally collect them.
 
-In particular, do not attempt to fully parse/maintain:
+### Layer 0: Python-Backed Compatibility
 
-- TSQ
-- TEV
-- TBK
-- TNT
-- SEV fallback behavior inside blocks
-- chunked/strobed stream reconstruction
-- all edge cases in TDT tank/block metadata
+This layer exposes selected Python `tdt` functionality through reticulate with
+minimal R adaptation.
 
-That is a serious binary-parser maintenance burden. Silent alignment or sampling-rate bugs would be scientifically harmful.
-
-### 4. Native R or compiled reader only if credible
-
-If a mature, maintained, license-compatible compiled C/C++ reader exists, wrapping it from R could be valuable.
-
-But do not assume such a project exists. Treat this as a future investigation item with strict requirements:
-
-- actively maintained or at least stable and understandable;
-- compatible license;
-- cross-platform;
-- can read the actual TDT formats needed by fiber photometry users;
-- has enough fixtures/tests to validate sampling rates, event times, stream lengths, and channel ordering;
-- can be wrapped without dragging in a large or fragile dependency stack.
-
-If no credible compiled reader exists, do not build one from scratch.
-
-### 5. Reticulate is a fallback, not the public model
-
-Reticulate can still serve scientists well when they need to import arbitrary existing TDT blocks, because TDT’s Python reader already handles many tricky binary and metadata cases.
-
-But if reticulate is used:
-
-- isolate it in an optional backend or companion package;
-- return pure R `tdt_block` objects;
-- do not expose Python objects as the primary public API;
-- do not make users manage Python just to use analysis helpers;
-- do not require Python for the core package to load or test.
-
-### 6. Small dependency footprint
-
-Core package dependencies should remain minimal.
-
-Likely acceptable:
-
-- base R
-- `tibble`
-- `rlang`, only where it meaningfully improves a data-masking or non-standard-evaluation interface
-- `testthat` in `Suggests`
-
-Avoid unless clearly justified:
-
-- `dplyr`
-- `tidyr`
-- `purrr`
-- `ggplot2`
-- `cli`
-- reticulate in the core package
-
-Base R tools like `lapply()`, `Map()`, `split()`, and explicit loops are fine.
-
-### 7. No unnecessary UI layer
-
-Do not add a command-line UI framework or messaging system.
-
-Use ordinary R errors, warnings, and messages. Prefer simple, testable behavior over polish.
-
-## Recommended package split
-
-### `tdtr`: pure-R core package
-
-This is the main package.
-
-Responsibilities:
-
-- define the R data model;
-- validate block objects;
-- provide accessors;
-- import simple/exported formats;
-- perform stream/event alignment;
-- provide trial/window extraction helpers;
-- document practical “how to get data into R” routes from TDT, MATLAB, and Python.
-
-This package should remain plausible for CRAN and possibly Bioconductor.
-
-### `tdtrpy`: optional Python bridge
-
-This is a possible companion package, not the core.
-
-Responsibilities:
-
-- use `reticulate` to call Python `tdt`;
-- import raw TDT blocks when the pure-R core cannot;
-- convert results immediately into `tdtr::tdt_block` objects;
-- hide Python implementation details from ordinary users.
-
-Possible public functions:
+Expected early functions:
 
 ```r
-read_tdt_block_python()
-read_tdt_sev_python()
+read_block_py()
+read_sev_py()
+epoc_filter_py()
 ```
 
-These should return `tdt_block`, not Python objects.
+These functions return small S3 wrappers around Python objects, such as
+`tdt_block_py`, rather than aggressively converting streams into R memory.
+Print and summary methods must be useful and must handle stale Python external
+pointers gracefully.
 
-### Why two packages may be better than one
+### Layer 1: R-Friendly Accessors
 
-A two-package design keeps the core package clean:
+This layer works on Python-backed wrappers and collected R objects:
 
-- `tdtr` can be installed and checked without Python.
-- `tdtr` can focus on analysis and object semantics.
-- `tdtrpy` can absorb reticulate environment complexity.
-- Users with hard import needs can install the bridge.
-- Users who only need exported data do not pay the Python cost.
+```r
+block_info()
+stream_names()
+streams()
+stream()
+epocs()
+epoc_names()
+epoc()
+```
 
-A one-package design with `reticulate` in `Suggests` is possible, but it risks blurring the core package’s identity.
+Accessors should return small R values where practical, but they must avoid
+silently copying large stream arrays into R.
 
-## Proposed R data model
+### Layer 2: Explicit Collection And Views
 
-Use an S3 class around a list.
+This layer materializes data into ordinary R objects when the user asks for it:
+
+```r
+collect_block()
+collect_stream()
+collect_epocs()
+as_tdt_block()
+as_tibble_epocs()
+as_tibble_stream()
+```
+
+Collection should be explicit, documented, and guarded with size-aware warnings
+where large NumPy arrays would be copied into R.
+
+Good public return values:
+
+- `tdt_block_py` S3 wrappers around live Python objects for low-level work;
+- `tdt_block` S3 objects;
+- lists;
+- matrices;
+- numeric vectors;
+- data frames/tibbles for events, summaries, and bounded table views.
+
+Avoid accidental or ambiguous return values such as:
+
+- unwrapped `python.builtin.object` values from high-level helpers;
+- unwrapped `python.builtin.dict` values from high-level helpers;
+- NumPy arrays that users need to handle directly unless they explicitly asked
+  for the Python-backed layer;
+- hidden full-stream conversion in convenience functions.
+
+Python objects are allowed as part of the explicit compatibility layer. R-native
+objects remain required for saved analysis state, downstream R workflows, and
+users who want to own the data in R.
+
+## Relationship To Python `tdt`
+
+Python `tdt` is the intended near-term backend for raw tank/block import.
+
+Reasons:
+
+- TDT binary formats have enough edge cases that a homegrown parser would be a
+  large maintenance burden.
+- The available development effort is better spent on clean R objects,
+  validation, accessors, and analysis workflows.
+- Users need useful access to tank data now, not a long binary-parser project.
+
+Implementation rules:
+
+- Use Python `tdt >= 0.7.3`.
+- Follow current reticulate package guidance:
+  - declare the Python requirement with `reticulate::py_require("tdt>=0.7.3")`,
+    typically in `.onLoad()`;
+  - import `tdt` with `reticulate::import("tdt", delay_load = TRUE,
+    convert = FALSE)`;
+  - let `library(tdtr)` load before Python is initialized so users can configure
+    their Python environment before first use.
+- Python-backed functions should fail early with clear diagnostics if Python,
+  reticulate, or Python `tdt` cannot be used.
+- The package should not feel like a working installation with missing core
+  functionality. Provide explicit availability checks, diagnostic helpers, and
+  direct error messages for Python-backed entry points.
+- Default to `convert = FALSE` for Python imports and wrappers.
+- Avoid converting NumPy arrays into R unless the user calls an explicit
+  collection or view helper.
+- The repository pixi environment is the supported dependency-management path
+  during early development.
+- Error messages should clearly explain how to install/configure Python `tdt`.
+
+## No Companion Package For Now
+
+Do not create a separate `tdtrpy` package at this stage.
+
+A split package might become useful later, but it would add coordination and
+user-facing complexity before there is enough user feedback to justify it.
+Keeping one package is acceptable as long as the Python-backed layer is explicit
+and the R-friendly layer does not force users to handle reticulate objects
+unless they choose that level of control.
+
+## Core Data Model
+
+Use S3 classes around ordinary R structures.
 
 ```r
 tdt_block <- list(
@@ -216,7 +197,8 @@ tdt_block <- list(
     subject = NULL,
     experiment = NULL,
     start_time = NULL,
-    duration = NULL
+    duration = NULL,
+    metadata = list()
   ),
   streams = list(
     StoreName = list(
@@ -239,27 +221,35 @@ tdt_block <- list(
 class(tdt_block) <- c("tdt_block", "list")
 ```
 
-### Stream orientation
+This object model is the target for materialized R data:
 
-Choose one R-native orientation and enforce it.
+- `collect_block()` / `as_tdt_block()` from a Python-backed block;
+- CSV/binary export import;
+- future compiled reader import, if one becomes credible.
 
-Recommended default:
+It is not required that every read operation immediately materialize this full
+object, because doing so can force expensive array copies for large streams.
+
+## Stream Orientation
+
+Use one R-native orientation everywhere:
 
 ```r
 nrow(data) == number of samples
 ncol(data) == number of channels
 ```
 
-That is convenient for R because:
+This differs from some Python/MATLAB conventions, but it is natural for R:
 
-- rows correspond to time/sample observations;
-- columns correspond to channels;
-- it maps naturally to data-frame/tibble views;
-- single-channel streams can be represented as a one-column matrix or numeric vector by explicit helper.
+- rows are observations over time;
+- columns are channels;
+- bounded table views can be created predictably;
+- sample indices exposed to users should be 1-based.
 
-This may differ from Python or MATLAB conventions. Importers should transpose when needed and document that all `tdtr` streams are samples-by-channels.
+Importers should transpose data when needed and record source metadata when
+useful.
 
-### Time conventions
+## Time Conventions
 
 Use seconds relative to block start.
 
@@ -267,11 +257,11 @@ Use seconds relative to block start.
 - `offset`: seconds from block start
 - `t0`: stream start time, seconds from block start
 - `fs`: samples per second
-- sample indices exposed to R users should be 1-based if returned as indices
 
-Avoid storing hidden file offsets or binary-reader-specific coordinates in user-facing objects.
+Avoid exposing binary-reader-specific file offsets or hidden coordinates as
+ordinary user-facing fields.
 
-### Epocs/events
+## Epocs And Events
 
 Represent epocs/events as a tibble or data frame with at least:
 
@@ -292,13 +282,12 @@ notes
 metadata
 ```
 
-Keep values flexible: numeric values are common, but some event sources may be textual or coded.
+Values should remain flexible. Numeric values are common, but textual or coded
+events should not be ruled out.
 
-## Core exported functions
+## In Scope
 
-The exact names can change, but this is the intended surface area.
-
-### Constructors and validators
+### Constructors And Validators
 
 ```r
 new_tdt_block(info = list(), streams = list(), epocs = NULL)
@@ -307,6 +296,8 @@ is_tdt_block(x)
 ```
 
 ### Accessors
+
+Use clean names. Package namespacing handles ambiguity for normal use.
 
 ```r
 block_info(x)
@@ -318,7 +309,89 @@ epoc_names(x)
 epoc(x, store)
 ```
 
-### Importers for exported/simple formats
+### Tank/Block Import
+
+Public tank/block import is in scope.
+
+The friendly default read path should avoid accidental full conversion. A
+reasonable target is:
+
+```r
+read_block(path, ..., collect = FALSE)
+```
+
+where `collect = FALSE` returns a Python-backed `tdt_block_py` wrapper and
+`collect = TRUE` returns a materialized `tdt_block`.
+
+The explicit Python-parity wrapper should remain available:
+
+```r
+read_block_py(path, ...)
+```
+
+Both paths call Python `tdt.read_block()` through `reticulate`.
+
+The wrapper should match Python argument names as closely as is reasonable in R,
+including store, channel, time range, event type, and export arguments. R-only
+helpers should make common workflows easier without obscuring the underlying
+Python behavior.
+
+### Python `tdt` Coverage
+
+Expose as much offline Python `tdt` functionality as practical when it can be
+wrapped thinly and tested.
+
+Early targets:
+
+```r
+read_block_py()
+read_sev_py()
+epoc_filter_py()
+```
+
+Additional Python functions can be added when they are stable, offline, and do
+not pull the package toward Synapse APIs, live streaming, UDP, hardware control,
+or a broad maintenance promise for the entire Python package.
+
+### Tank Extraction
+
+Tank extraction is in scope when it is generic.
+
+Generic extraction means:
+
+- read a block/tank;
+- select stores by name/type/channel/time;
+- return an R object or write a documented R-friendly export;
+- avoid lab-specific directory structures, naming rules, and subject conventions.
+
+Not generic:
+
+- project-specific analysis directories;
+- lab-specific subject parsing;
+- hard-coded TTL/isobestic/experimental store assumptions;
+- writing `DO_NOT_USE.json` markers as a package-level behavior.
+
+Possible interfaces:
+
+```r
+extract_stores(block, stores, ...)
+write_tdt_export(block, path, ...)
+```
+
+If an extraction function reads directly from disk, it should still return or
+write R-native structures rather than exposing Python objects.
+
+Initial write formats should support simple, durable outputs first:
+
+- RDS for lossless R-native objects and metadata;
+- CSV/JSON for interoperability and inspection.
+
+Apache Arrow/Parquet may be valuable for larger continuous streams because it is
+columnar, efficient, and cross-language. Treat Arrow as a format to evaluate,
+not as a required core dependency until there is a clear need. If added, prefer
+keeping `arrow` in `Suggests` and making Arrow export optional.
+
+### Importers For Exported/Simple Formats
 
 ```r
 read_tdt_export(path, ...)
@@ -327,25 +400,25 @@ read_epocs_csv(path, ...)
 read_stream_binary(path, fs, shape, name, dtype = "float32", t0 = 0, ...)
 ```
 
-Potentially later:
+These importers are important because some users will arrive with data exported
+from Python, MATLAB, Synapse/OpenScope, or another trusted route.
 
-```r
-read_sev(path, ...)
-```
-
-Only implement `read_sev()` if the scope is narrow, validated, and testable. Do not let `read_sev()` silently expand into a full block parser.
-
-### Coercion and table views
+### Coercion And Table Views
 
 ```r
 as_tdt_block(x, ...)
+collect_block(x, ...)
+collect_stream(x, store, ...)
+collect_epocs(x, store = NULL, ...)
 as_tibble_epocs(x, store = NULL)
-as_tibble_stream(x, stream, window = NULL, downsample = NULL)
+as_tibble_stream(x, stream, window = NULL, downsample = NULL, max_rows = NULL)
 ```
 
-Avoid making huge long-form tibbles by accident. If `as_tibble_stream()` could create a very large table, require the user to specify a window, downsampling, or an explicit override.
+Avoid accidentally expanding huge high-frequency streams. If a conversion could
+create a very large table, require a window, downsampling, or an explicit
+override.
 
-### Ranges and trial helpers
+### Ranges And Trial Helpers
 
 ```r
 as_ranges(x)
@@ -355,9 +428,10 @@ slice_trials(x, stream, ranges, channels = NULL)
 align_to_events(x, stream, events, pre, post, channels = NULL)
 ```
 
-These helpers are central. They are more important than imitating Python reader signatures.
+These are central to the package. They are more important than matching Python
+function signatures.
 
-### Photometry-oriented helpers
+### Conservative Photometry Helpers
 
 Potential early additions:
 
@@ -367,299 +441,190 @@ summarize_trials(x, fun = mean, ...)
 downsample_stream(x, stream, factor = NULL, fs = NULL)
 ```
 
-Be cautious with domain-specific calculations such as dF/F, isosbestic correction, and regression correction. They are scientifically important, but the package should avoid embedding a single lab’s analysis assumptions too early.
-
-## Import strategy
-
-### First-class route: exported data into R
-
-The package should help users get into R quickly from whatever import route they already trust.
-
-Document simple snippets for:
-
-- Python `tdt.read_block()` exports;
-- MATLAB `TDTbin2mat()` exports;
-- TDT/Synapse/OpenScope CSV or ASCII export, where available.
-
-The R package can then read the exported stream/event files and provide a good analysis workflow.
-
-### Why this is acceptable
-
-This package does not need to solve every binary import problem on day one.
-
-A useful first version can provide:
-
-- clear object model;
-- reliable event alignment;
-- trial extraction;
-- simple importers;
-- examples showing users how to export into those simple importers.
-
-That is enough for many labs to adopt the package for analysis while preserving the option of better import backends later.
-
-## Example export snippets to document
-
-These are not necessarily package code. They are documentation snippets to help users move data into R.
-
-### Python to CSV, small or moderate streams
-
-```python
-import tdt
-import pandas as pd
-
-block_path = "path/to/block"
-store = "Wav1"
-
-data = tdt.read_block(block_path, evtype=["streams", "epocs"], store=store)
-
-s = data.streams[store]
-
-# Convert to samples x channels for tdtr.
-# Python tdt stream arrays are often channel x samples.
-stream_df = pd.DataFrame(s.data.T)
-stream_df.to_csv(f"{store}_stream.csv", index=False)
-
-# Example epoc export.
-# Replace "EpocStore" with the actual event store name.
-e = data.epocs["EpocStore"]
-epoc_df = pd.DataFrame({
-    "store": "EpocStore",
-    "onset": e.onset,
-    "offset": e.offset,
-    "value": e.data
-})
-epoc_df.to_csv("epocs.csv", index=False)
-```
-
-R side:
-
-```r
-block <- new_tdt_block(
-  streams = list(
-    Wav1 = read_stream_csv("Wav1_stream.csv", fs = 1017.252, name = "Wav1")
-  ),
-  epocs = read_epocs_csv("epocs.csv")
-)
-```
-
-### Python to binary plus metadata, larger streams
-
-For larger streams, CSV may be too slow and too large. A binary file plus JSON/CSV metadata can be more practical.
-
-```python
-import json
-import tdt
-import numpy as np
-
-block_path = "path/to/block"
-store = "Wav1"
-
-data = tdt.read_block(block_path, evtype=["streams"], store=store)
-s = data.streams[store]
-
-# samples x channels
-arr = np.asarray(s.data.T, dtype="float32")
-arr.tofile(f"{store}_stream_f32.bin")
-
-with open(f"{store}_stream_meta.json", "w") as f:
-    json.dump({
-        "name": store,
-        "fs": float(s.fs),
-        "n_samples": int(arr.shape[0]),
-        "n_channels": int(arr.shape[1]),
-        "dtype": "float32",
-        "orientation": "samples_x_channels"
-    }, f, indent=2)
-```
-
-R side:
-
-```r
-stream <- read_stream_binary(
-  "Wav1_stream_f32.bin",
-  fs = 1017.252,
-  shape = c(n_samples = 100000, n_channels = 2),
-  name = "Wav1",
-  dtype = "float32"
-)
-```
-
-### MATLAB to CSV
-
-```matlab
-block_path = 'path/to/block';
-data = TDTbin2mat(block_path, 'TYPE', {'streams', 'epocs'}, 'STORE', 'Wav1');
-
-% TDT/MATLAB stream data may be channels x samples.
-% Transpose to samples x channels for tdtr.
-writematrix(data.streams.Wav1.data', 'Wav1_stream.csv');
-
-onset = data.epocs.EpocStore.onset(:);
-offset = data.epocs.EpocStore.offset(:);
-value = data.epocs.EpocStore.data(:);
-store = repmat("EpocStore", numel(onset), 1);
-
-T = table(store, onset, offset, value);
-writetable(T, 'epocs.csv');
-```
-
-R side:
-
-```r
-stream <- read_stream_csv("Wav1_stream.csv", fs = 1017.252, name = "Wav1")
-events <- read_epocs_csv("epocs.csv")
-
-block <- new_tdt_block(
-  streams = list(Wav1 = stream),
-  epocs = events
-)
-```
-
-## Tidyverse stance
-
-Use `tibble` where it helps represent tabular event data.
-
-Do not require the rest of the tidyverse.
-
-Good uses of tibbles:
-
-- epoc/event tables;
-- block summaries;
-- trial metadata;
-- small/downsampled stream views;
-- list-column trial outputs.
-
-Bad uses of tibbles:
-
-- automatically expanding raw high-frequency streams into one row per sample per channel;
-- forcing all analysis into long-format tables;
-- introducing `dplyr`/`tidyr` dependencies for small transformations that base R can handle.
-
-Use plain functions and explicit arguments rather than NSE when possible. Use `rlang` only when it clearly simplifies a user-facing data-masking interface.
-
-## CRAN/Bioconductor posture
-
-Design the core package so it can plausibly pass CRAN checks:
-
-- no Python required;
-- no internet required in tests;
-- no downloads during installation;
-- small dependency tree;
-- deterministic examples;
-- tests using small fixtures and synthetic data.
-
-Bioconductor may become appropriate later if the package adopts Bioconductor-style containers or workflows, but do not force that in the first version.
-
-Avoid decisions that would make either path harder.
-
-## Testing strategy
-
-Use small, synthetic fixtures first.
-
-Test invariants:
-
-- `new_tdt_block()` produces valid structure;
-- stream matrices are samples x channels;
-- event onsets/offsets are numeric seconds;
-- `ranges_from_epocs()` returns expected windows;
-- `slice_stream()` returns expected samples;
-- `slice_trials()` preserves trial order and dimensions;
-- conversion from CSV/binary fixtures preserves shape and values.
-
-No tests should depend on:
-
-- internet access;
-- live TDT hardware;
-- Python;
-- MATLAB;
-- large raw TDT binary blocks.
-
-If an optional bridge package is created, it can have separate tests that skip cleanly when Python or `tdt` is unavailable.
-
-## Future optional Python bridge
-
-If a Python bridge is added, prefer a companion package:
-
-```r
-tdtrpy
-```
-
-Bridge design principles:
-
-- import Python `tdt` with reticulate;
-- call Python only inside importer functions;
-- immediately convert into `tdtr::tdt_block`;
-- never expose live Python objects as the standard return value;
-- avoid making the user manage Python unless they explicitly choose that route;
-- skip tests when Python or the Python `tdt` package is unavailable.
-
-Possible functions:
-
-```r
-read_tdt_block_python(path, store = NULL, t1 = 0, t2 = 0, ...)
-read_tdt_sev_python(path, ...)
-```
-
-These functions should be framed as import conveniences, not as the center of the package.
-
-## Future optional compiled backend
-
-If a credible compiled TDT reader exists, consider wrapping it.
-
-Possible integration options:
-
-- Rcpp;
-- cpp11;
-- system library wrapper;
-- separate backend package.
-
-Do not implement the binary reader yourself unless the project scope changes dramatically.
-
-A compiled backend should still return the same `tdt_block` object as every other importer.
-
-## Non-goals for version 0.1
+Be cautious with dF/F, isosbestic correction, regression correction, and other
+scientific analysis choices. They are important, but the package should avoid
+embedding a single lab's analysis assumptions too early.
+
+## Out Of Scope
 
 Do not implement:
 
 - full TDT block binary parsing in R;
-- Python function parity;
-- public reticulate-backed Python object wrappers;
+- blind Python function parity for the whole `tdt` package;
 - Synapse HTTP client;
 - UDP interfaces;
 - real-time acquisition;
+- live streaming;
 - BH32/APIStreamer/PynapseUDP equivalents;
-- a plotting package;
-- a full photometry statistical-analysis framework;
-- a mandatory tidyverse pipeline.
+- plotting as a core package responsibility;
+- full photometry statistical-analysis framework;
+- mandatory tidyverse pipelines;
+- project-specific extraction workflows;
+- lab-specific tank-name parsing in the core API.
 
-## Initial development phases
+## Dependency Posture
 
-### Phase 0: package scaffold
+Keep dependencies small where practical.
 
-- `DESCRIPTION`
-- `NAMESPACE`
-- `R/constructors.R`
-- `R/accessors.R`
-- `R/import-csv.R`
-- `R/import-binary.R`
-- `R/ranges.R`
-- `R/slice.R`
-- `R/summary.R`
-- `tests/testthat/`
+Likely acceptable:
 
-### Phase 1: data model and importers
+- base R;
+- `tibble`;
+- `reticulate` in `Imports` for Python-backed tank/block import;
+- `rlang` only where it improves errors or a user-facing interface enough to
+  justify the dependency;
+- `jsonlite` only for JSON metadata/export helpers that remain in scope;
+- `testthat` in `Suggests`.
+
+Avoid unless clearly justified:
+
+- `dplyr`;
+- `tidyr`;
+- `purrr`;
+- `ggplot2`;
+- `cli`.
+
+Potential optional dependencies:
+
+- `arrow`, if large-stream export/import benefits justify the dependency and
+  installation cost.
+
+Use base R for straightforward transformations.
+
+## CRAN/Bioconductor Posture
+
+The package is not targeting CRAN or Bioconductor in the near term because
+Python `tdt` is an essential runtime dependency for raw tank/block access. It
+should still follow CRAN/Bioconductor conventions where practical: ordinary R
+objects, deterministic tests, small examples, clear errors, and no installation
+side effects.
+
+Design rules:
+
+- follow reticulate's `py_require()` and `delay_load` pattern so package load
+  does not initialize Python prematurely;
+- Python-backed functions may require Python and Python `tdt`;
+- tests that require Python `tdt` should skip cleanly when unavailable;
+- installation should not download data;
+- examples should be deterministic and small;
+- binary import examples should be guarded or documentation-only unless fixtures
+  are small and reliable;
+- materialized analysis objects should be ordinary R objects that can be saved
+  and restored;
+- Python-backed wrapper objects should document reticulate's stale external
+  pointer behavior and offer explicit collection for durable state.
+
+Bioconductor may become appropriate later if the package adopts
+Bioconductor-style containers or workflows. Do not force that in the first
+version.
+
+## Testing Strategy
+
+Use small synthetic fixtures first.
+
+Test invariants:
+
+- `new_tdt_block()` produces valid structure;
+- Python-backed import returns a valid `tdt_block_py` wrapper;
+- explicit collection returns `tdt_block`, not unwrapped Python objects;
+- stream matrices are samples x channels;
+- event onsets/offsets are numeric seconds;
+- accessors return stable structures;
+- `ranges_from_epocs()` returns expected windows;
+- `slice_stream()` returns expected samples;
+- `slice_trials()` preserves trial order and dimensions;
+- CSV/binary import preserves shape and values;
+- Python-backed code fails clearly when Python `tdt` is unavailable;
+- print/summary methods handle stale Python external pointers.
+
+Use a two-tier fixture strategy:
+
+- synthetic Python objects created in tests for fast, deterministic conversion
+  and accessor coverage;
+- one or more small real TDT datasets, if a license-compatible public fixture
+  can be found from DANDI, TDT, or another reliable source.
+
+Add targeted profiling before committing to helpers that might copy large stream
+arrays across the R/Python boundary.
+
+No required tests should depend on:
+
+- internet access;
+- live TDT hardware;
+- MATLAB;
+- large raw TDT binary blocks.
+
+## Development Phases
+
+The exact order can change when implementation details make another path more
+natural, but the package should converge on this shape.
+
+### Phase 0: Scope And Scaffold
+
+- update package documentation to this scope;
+- remove or internalize public project-specific and lab-specific assumptions;
+- decide which existing code is retained as internal backend code.
+
+### Phase 1: R Data Model
 
 Implement:
 
 ```r
 new_tdt_block()
 validate_tdt_block()
+is_tdt_block()
+print.tdt_block()
+summary.tdt_block()
+```
+
+### Phase 2: Python-Backed Import Layer
+
+Implement:
+
+```r
+read_block()
+read_block_py()
+read_sev_py()
+epoc_filter_py()
+tdt_available()
+tdt_config()
+```
+
+Use reticulate `py_require()` and delayed imports.
+
+### Phase 3: R Collection And Simple Importers
+
+Implement:
+
+```r
+collect_block()
+collect_stream()
+collect_epocs()
 read_stream_csv()
 read_epocs_csv()
 read_stream_binary()
 ```
 
-### Phase 2: workflow helpers
+Collection functions materialize ordinary R objects and should warn before
+large copies when sizes can be estimated.
+
+### Phase 4: Accessors And Views
+
+Implement:
+
+```r
+block_info()
+streams()
+stream_names()
+stream()
+epocs()
+epoc_names()
+epoc()
+as_tibble_epocs()
+as_tibble_stream()
+```
+
+### Phase 5: Workflow Helpers
 
 Implement:
 
@@ -669,58 +634,32 @@ ranges_from_epocs()
 slice_stream()
 slice_trials()
 align_to_events()
-as_tibble_epocs()
-as_tibble_stream()
 ```
 
-### Phase 3: documentation examples
+### Phase 6: Documentation Examples
 
-Write README examples for:
+Write examples for:
 
+- reading a TDT block through the package;
+- Python-backed import diagnostics;
+- keeping large arrays in Python until explicit collection;
 - Python export to R;
 - MATLAB export to R;
 - CSV/binary import;
-- trial-aligned extraction;
-- event-aligned summary.
+- event-aligned extraction;
+- trial-level summaries.
 
-### Phase 4: optional import backend decision
+## External Source Context
 
-Decide whether to pursue:
+Developers may keep a local copy of Python `tdt` source under `external/` for
+reference while designing converters and import behavior. Treat it as untracked
+local reference material, not package code.
 
-- `tdtrpy` reticulate bridge;
-- compiled reader wrapper;
-- narrow native `read_sev()` only;
-- no raw binary backend yet.
+Do not vendor or execute that source as part of the R package unless a later
+decision explicitly changes this.
 
-Do not start Phase 4 until the R data model is stable enough that every backend can target it.
+## One-Sentence Summary
 
-## Codex guidance
-
-When using Codex, keep tasks narrow.
-
-Good prompts:
-
-- “Implement `new_tdt_block()` and `validate_tdt_block()` according to `package-scoping.md`.”
-- “Add `read_stream_csv()` and tests for samples-by-channels orientation.”
-- “Implement `ranges_from_epocs()` and `slice_stream()` with tests.”
-- “Write README snippets for Python/MATLAB export into `tdtr`.”
-
-Bad prompts:
-
-- “Port the TDT Python package to R.”
-- “Implement `read_block()`.”
-- “Match Python function signatures.”
-- “Add reticulate wrappers for everything.”
-- “Build a full photometry analysis package.”
-
-## External context to keep in mind
-
-TDT’s official MATLAB offline tools include `TDTbin2mat`, `TDTfilter`, and `SEV2mat`. The docs describe reading block files, selecting event types/stores/channels, using time windows, applying epoc filters, and reading SEV files. This supports the idea that import/filter/window workflows are central to TDT analysis.
-
-TDT’s fiber photometry documentation points users to MATLAB and Python import routes and workbook examples, and also notes CSV/ASCII export resources. This supports documenting practical export-to-R snippets rather than trying to own every binary import path in version 0.1.
-
-A quick ecosystem scan did not reveal an obvious, mature, standalone C++ TDT block reader ready to wrap. Existing third-party readers can have edge cases; for example, a public issue in `python-neo` described incorrect sampling rates/durations/no data for a particular SEV-backed TDT block. Treat any non-official parser as something to validate carefully before depending on it.
-
-## One-sentence summary
-
-Build `tdtr` as a small, pure-R, event-alignment and data-model package for TDT-style fiber photometry data; support exported/simple import paths first; keep reticulate or compiled raw-block readers as optional future backends that return the same pure R objects.
+Build `tdtr` as a reticulate-backed R package for TDT tank/block access:
+explicit Python-backed wrappers for control and scale, R-friendly helpers for
+normal use, and ordinary R objects whenever users intentionally collect data.

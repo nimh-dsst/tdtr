@@ -3,8 +3,10 @@
 ^\.lintr$
 ^\.pixi$
 ^\.pixi/
+^external$
+^external/
 ^pixi\.lock$
 ^pixi\.toml$
 ^README\.Rmd$
 ^scripts$
-^tdtR\.Rproj$
+^tdtr\.Rproj$

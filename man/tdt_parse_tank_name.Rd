@@ -16,7 +16,7 @@ A list with \code{tank_name}, \code{cage_number}, \code{num_subjects},
 \code{subject_ids}, and \code{tank_datetime}.
 }
 \description{
-Parses tank names used by the ArchiveFlow photometry workflow, for example
+Parses tank names that follow a subject-date-time convention, for example
 \verb{12_M1-250103-001644}, \verb{12_M1_2-250103-001644}, and
 \verb{12_M1_F2-250103-001644}.
 }

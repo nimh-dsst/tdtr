@@ -27,8 +27,8 @@ tdt_calc_timepoints <- function(n_points, fs, num_of_points = 128) {
 
 #' Format a TDT stream as a data frame
 #'
-#' Converts a single-channel TDT stream into the row-wise format used by the
-#' ArchiveFlow photometry extraction workflow.
+#' Converts a single-channel TDT stream into a row-wise data frame for downstream
+#' analysis.
 #'
 #' @param data_info TDT block info object or list containing `blockname`.
 #' @param stream TDT stream object or list containing `name`, `fs`, `channel`,

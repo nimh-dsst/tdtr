@@ -1,5 +1,5 @@
 [workspace]
-name = "tdtR"
+name = "tdtr"
 version = "0.0.0"
 description = "R package interface for Tucker-Davis Technologies data"
 channels = ["conda-forge"]
