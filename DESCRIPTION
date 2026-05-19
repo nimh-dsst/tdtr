@@ -1,6 +1,6 @@
 Package: tdtr
 Title: Read and Export Tucker-Davis Technologies Data from R
-Version: 0.0.0.9000
+Version: 0.0.1
 Authors@R: c(
     person("John", "Lee", email = "johnleenimh@gmail.com", role = c("aut", "cre"))
   )
