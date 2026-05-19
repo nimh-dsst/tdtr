@@ -23,8 +23,10 @@ stacks.
 
 ## Quick start
 
-```
-pixi ...
+Use the getting-started vignette to get started.
+
+```r
+vignette("getting-started", package = "tdtr")
 ```
 
 ## Python backend
