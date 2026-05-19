@@ -30,6 +30,49 @@ test_that("single evtype values are passed to Python as event-type lists", {
   expect_equal(epoc_names(block), character(0))
 })
 
+test_that("read_block store filters accept public and original stream names", {
+  expect_true(tdt_available(initialize = TRUE))
+
+  path <- tdtr_example_block_path()
+
+  by_public_name <- read_block(path, evtype = "streams", store = "_465A", t1 = 0, t2 = 1, verbose = 0)
+  by_original_name <- read_block(path, evtype = "streams", store = "465A", t1 = 0, t2 = 1, verbose = 0)
+  both_photometry <- read_block(
+    path,
+    evtype = "streams",
+    store = c("_405A", "_465A"),
+    t1 = 0,
+    t2 = 1,
+    verbose = 0
+  )
+
+  expect_equal(stream_names(by_public_name), "_465A")
+  expect_equal(stream_names(by_original_name), "_465A")
+  expect_equal(stream_names(both_photometry), c("_405A", "_465A"))
+  expect_gt(nrow(collect_stream(by_public_name, "_465A")), 0)
+})
+
+test_that("read_block store normalization preserves ordinary stream filters", {
+  expect_true(tdt_available(initialize = TRUE))
+
+  path <- tdtr_example_block_path()
+  block <- read_block(path, evtype = "streams", store = "Fi1r", t1 = 0, t2 = 1, verbose = 0)
+
+  expect_equal(stream_names(block), "Fi1r")
+  expect_gt(nrow(collect_stream(block, "Fi1r")), 0)
+})
+
+test_that("read_block_py preserves Python tdt store matching", {
+  expect_true(tdt_available(initialize = TRUE))
+
+  path <- tdtr_example_block_path()
+  public_name <- read_block_py(path, evtype = "streams", store = "_465A", t1 = 0, t2 = 1, verbose = 0)
+  original_name <- read_block_py(path, evtype = "streams", store = "465A", t1 = 0, t2 = 1, verbose = 0)
+
+  expect_equal(stream_names(public_name), character(0))
+  expect_equal(stream_names(original_name), "_465A")
+})
+
 test_that("profile_tdt_memory reports read and collection steps", {
   expect_true(tdt_available(initialize = TRUE))
 

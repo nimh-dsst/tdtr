@@ -20,3 +20,13 @@ A \code{tdt_block_py} wrapper or a materialized \code{tdt_block}.
 \description{
 Read a TDT block through Python \code{tdt}
 }
+\details{
+\code{read_block()} normalizes read-time \code{store} filters against the block
+header, so the stream names returned by \code{\link[=stream_names]{stream_names()}} can also be used for
+filtering. This matters for TDT stores whose original names are not valid
+Python identifiers. For example, Python \code{tdt} filters a store originally
+named \verb{465A} with \code{store = "465A"}, but the returned stream is exposed under
+the sanitized name \verb{_465A}. \code{read_block()} accepts either spelling. Use
+\code{\link[=read_block_py]{read_block_py()}} when you need Python \code{tdt.read_block()} store matching
+exactly as implemented upstream.
+}

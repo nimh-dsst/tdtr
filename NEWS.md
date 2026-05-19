@@ -11,6 +11,8 @@ Initial reticulate-backed package direction.
 * Adds explicit collection helpers for converting selected Python-backed data
   into ordinary R objects.
 * Adds range helpers for event-aligned and bounded reads.
+* Normalizes high-level `read_block()` store filters so sanitized stream names
+  such as `_465A` can be used for read-time selection.
 * Adds `profile_tdt_memory()` for local memory/copy diagnostics.
 * Includes a small raw TDT example block under `inst/extdata`, accessed with
   `tdtr_example_block_path()`.

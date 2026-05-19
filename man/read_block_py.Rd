@@ -44,3 +44,9 @@ This is the explicit Python-backed compatibility wrapper for
 \code{tdt.read_block()}. It keeps Python objects live and does not copy stream
 arrays into R unless a collection helper is called later.
 }
+\details{
+\code{read_block_py()} passes \code{store} directly to Python \code{tdt.read_block()}. For
+stores whose returned names are sanitized by Python, such as \verb{_465A}, pass the
+original TDT store ID (\verb{465A}) or use \code{\link[=read_block]{read_block()}} for tdtr's
+header-based normalization.
+}

@@ -88,6 +88,11 @@ for inspection and bounded workflows, but it is not durable analysis state.
 Save read parameters or explicitly collected R objects when results need to
 persist across R sessions.
 
+For read-time stream filtering, `read_block()` accepts the names returned by
+`stream_names()`. This includes sanitized Python names such as `_465A`; the raw
+`read_block_py()` wrapper preserves Python `tdt` matching and expects the
+original TDT store ID (`465A`) for that case.
+
 ## Documentation
 
 - `vignette("getting-started", package = "tdtr")` covers the R-friendly

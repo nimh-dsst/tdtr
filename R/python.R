@@ -101,9 +101,25 @@ new_tdt_py <- function(py, path = NULL, args = list(), class = character()) {
 #'   `TRUE`, collect into a materialized R `tdt_block`.
 #'
 #' @return A `tdt_block_py` wrapper or a materialized `tdt_block`.
+#'
+#' @details
+#' `read_block()` normalizes read-time `store` filters against the block
+#' header, so the stream names returned by [stream_names()] can also be used for
+#' filtering. This matters for TDT stores whose original names are not valid
+#' Python identifiers. For example, Python `tdt` filters a store originally
+#' named `465A` with `store = "465A"`, but the returned stream is exposed under
+#' the sanitized name `_465A`. `read_block()` accepts either spelling. Use
+#' [read_block_py()] when you need Python `tdt.read_block()` store matching
+#' exactly as implemented upstream.
+#'
 #' @export
 read_block <- function(block_path, ..., collect = FALSE) {
-  block <- read_block_py(block_path, ...)
+  args <- list(...)
+  if (!is.null(args$store) && !tdt_store_filter_is_empty(args$store)) {
+    args$store <- tdt_normalize_read_store_filter(block_path, args$store, args)
+  }
+
+  block <- do.call(read_block_py, c(list(block_path = block_path), args))
   if (isTRUE(collect)) {
     collect_block(block)
   } else {
@@ -111,11 +127,121 @@ read_block <- function(block_path, ..., collect = FALSE) {
   }
 }
 
+tdt_read_block_evtype <- function(evtype) {
+  if (is.null(evtype)) {
+    NULL
+  } else if (is.character(evtype)) {
+    as.list(evtype)
+  } else {
+    evtype
+  }
+}
+
+tdt_store_filter_is_empty <- function(store) {
+  is.null(store) ||
+    (is.character(store) && length(store) == 0) ||
+    (is.character(store) && length(store) == 1 && !nzchar(store)) ||
+    (is.list(store) && length(store) == 0)
+}
+
+tdt_store_filter_is_character <- function(store) {
+  is.character(store) ||
+    (is.list(store) && all(vapply(store, function(x) {
+      is.character(x) && length(x) == 1
+    }, logical(1))))
+}
+
+tdt_translate_store_filter <- function(store, store_map) {
+  translate_one <- function(value) {
+    if (!is.character(value) || length(value) != 1 || is.na(value)) {
+      return(value)
+    }
+    mapped <- if (value %in% names(store_map)) store_map[[value]] else NULL
+    if (is.null(mapped) || length(mapped) != 1 || is.na(mapped) || !nzchar(mapped)) {
+      value
+    } else {
+      mapped
+    }
+  }
+
+  if (is.character(store)) {
+    return(vapply(store, translate_one, character(1), USE.NAMES = FALSE))
+  }
+  if (is.list(store)) {
+    return(lapply(store, translate_one))
+  }
+  store
+}
+
+tdt_read_block_store_map <- function(block_path, args, tdt) {
+  headers <- args$headers %||% NULL
+  stores <- tdt_object_get(headers, "stores", NULL)
+
+  if (is.null(stores)) {
+    header_args <- list(
+      block_path = tdt_normalize_path(block_path, must_work = FALSE),
+      headers = 1,
+      verbose = 0
+    )
+
+    for (name in c("evtype", "t1", "t2", "sortname", "dmy", "noepocauto")) {
+      if (!is.null(args[[name]])) {
+        header_args[[name]] <- args[[name]]
+      }
+    }
+    header_args$evtype <- tdt_read_block_evtype(header_args$evtype)
+
+    headers <- tdt_quiet_python_output(
+      tdt_call(
+        tdt$read_block,
+        header_args,
+        error = "Failed to inspect TDT block stores with Python `tdt.read_block(headers = 1)`."
+      )
+    )
+    stores <- tdt_object_get(headers, "stores", NULL)
+  }
+
+  keys <- tdt_container_names(stores, prefer_original = FALSE)
+  originals <- vapply(keys, function(key) {
+    store_obj <- tdt_object_get(stores, key)
+    original <- tdt_py_to_r(tdt_object_get(store_obj, "name", key))
+    if (is.character(original) && length(original) == 1 && nzchar(original)) {
+      original
+    } else {
+      key
+    }
+  }, character(1), USE.NAMES = FALSE)
+  names(originals) <- keys
+  originals
+}
+
+tdt_normalize_read_store_filter <- function(block_path, store, args) {
+  if (!tdt_store_filter_is_character(store)) {
+    return(store)
+  }
+
+  tdt <- tdt_import()
+  store_map <- tryCatch(
+    tdt_read_block_store_map(block_path, args, tdt),
+    error = function(e) NULL
+  )
+  if (is.null(store_map) || length(store_map) == 0) {
+    return(store)
+  }
+
+  tdt_translate_store_filter(store, store_map)
+}
+
 #' Read a TDT block through Python `tdt`
 #'
 #' This is the explicit Python-backed compatibility wrapper for
 #' `tdt.read_block()`. It keeps Python objects live and does not copy stream
 #' arrays into R unless a collection helper is called later.
+#'
+#' `read_block_py()` passes `store` directly to Python `tdt.read_block()`. For
+#' stores whose returned names are sanitized by Python, such as `_465A`, pass the
+#' original TDT store ID (`465A`) or use [read_block()] for tdtr's
+#' header-based normalization.
 #'
 #' @param block_path Path to a TDT block/tank directory.
 #' @param bitwise,channel,combine,headers,nodata,ranges,store,t1,t2,evtype,verbose,sortname,export,scale,dtype,outdir,prefix,outfile,dmy,noepocauto
@@ -152,9 +278,7 @@ read_block_py <- function(block_path,
   if (!is.null(ranges)) {
     ranges <- as_ranges(ranges)
   }
-  if (!is.null(evtype)) {
-    evtype <- as.list(evtype)
-  }
+  evtype <- tdt_read_block_evtype(evtype)
 
   args <- c(
     list(

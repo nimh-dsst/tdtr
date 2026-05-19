@@ -136,9 +136,16 @@ package supports an option that the R wrapper has not named explicitly.
 
 ## Store Filters And Names
 
-Read-time store filtering is delegated to Python `tdt`. This means store-name
-behavior can expose details of the underlying Python package. In this packaged
-fixture, filtering to `Fi1r` works as expected.
+Python `tdt` distinguishes the original four-character TDT store ID from the
+sanitized Python `StructType` key used in returned objects. In this fixture,
+the original photometry store IDs are `405A` and `465A`, while the returned
+stream names are `_405A` and `_465A` because Python identifiers cannot start
+with a digit. Header stores retain the original IDs in their `.name` fields;
+after data are read, Python `tdt` exposes the sanitized stream names, and those
+are the names returned by `stream_names()`.
+
+`read_block()` inspects the block header before a filtered read and accepts
+either spelling. Ordinary store names such as `Fi1r` still work as expected.
 
 ```{r}
 fi1r_only <- read_block(
@@ -154,8 +161,8 @@ stream_names(fi1r_only)
 summary(fi1r_only)$streams
 ```
 
-The same read-time filter does not currently select the leading-underscore
-photometry stores by the stream names returned after a general read.
+The same high-level reader can filter by the stream name returned from
+`stream_names()`.
 
 ```{r}
 photometry_filter <- read_block(
@@ -170,13 +177,44 @@ photometry_filter <- read_block(
 stream_names(photometry_filter)
 ```
 
-That behavior should be visible rather than hidden. Until the wrapper provides a
-higher-level normalization for this case, use a bounded read and then select the
-stream by name at collection time.
+Passing the original TDT store ID is equivalent.
+
+```{r}
+photometry_original <- read_block(
+  example_path,
+  evtype = "streams",
+  store = "465A",
+  t1 = 1,
+  t2 = 3,
+  verbose = 0
+)
+
+stream_names(photometry_original)
+```
+
+Use `read_block_py()` when you need the underlying Python behavior exactly. In
+Python `tdt` 0.7.3, read-time `store` matching happens before key
+sanitization, so the raw wrapper expects `465A`, not `_465A`, for this store.
+
+```{r}
+raw_python_filter <- read_block_py(
+  example_path,
+  evtype = "streams",
+  store = "_465A",
+  t1 = 1,
+  t2 = 3,
+  verbose = 0
+)
+
+stream_names(raw_python_filter)
+```
+
+After reading, tdtr accessors and collection helpers use the stream names shown
+by `stream_names()`.
 
 ```{r}
 photometry <- collect_stream(
-  bounded,
+  photometry_filter,
   "_465A",
   as = "list",
   include_time = TRUE
