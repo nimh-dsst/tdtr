@@ -9,5 +9,5 @@ data-raw/tdt-demo/
 data-raw/tdt-demo-profile/
 *.Rcheck
 tdtr_*.tar.gz
-docs/*pdf
+docs/*.pdf
 pixi.lock

@@ -1,11 +1,19 @@
 # tdtr 0.0.0.9000
 
-* Adds a layered reticulate-backed interface for Python `tdt>=0.7.3`.
-* Adds Python-backed wrappers, generic accessors, explicit collection helpers,
-  range helpers, and simple CSV/binary importers.
-* Removes lab-specific extraction workflows from the exported package surface.
-* Adds a vignette explaining which interface layer to use and reticulate gotchas.
-* Adds optional development scripts for downloading the official TDT demo data
-  and profiling R/Python memory behavior during collection.
-* Adds `tdtr_example_block`, a small materialized package dataset derived from
-  the official TDT example data.
+Initial reticulate-backed package direction.
+
+* Uses Python `tdt>=0.7.3` through `reticulate` as the raw TDT tank/block
+  backend.
+* Adds Python-backed wrappers for `read_block()`, `read_sev()`, and
+  `epoc_filter()` workflows.
+* Adds R-friendly accessors for block metadata, stream names, event names, and
+  individual stream/event stores.
+* Adds explicit collection helpers for converting selected Python-backed data
+  into ordinary R objects.
+* Adds range helpers for event-aligned and bounded reads.
+* Adds `profile_tdt_memory()` for local memory/copy diagnostics.
+* Includes a small raw TDT example block under `inst/extdata`, accessed with
+  `tdtr_example_block_path()`.
+* Adds getting-started and advanced-usage vignettes.
+* Keeps Synapse API work, live acquisition, native R binary parsing, and
+  lab-specific analysis conventions out of scope for the core package.

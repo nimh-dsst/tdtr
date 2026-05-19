@@ -27,6 +27,33 @@ Loading `tdtr` declares its Python requirement through `reticulate`. Before
 starting an analysis, confirm that Python and `tdt` resolve in the current R
 session.
 
+For a project-owned multi-language environment, Pixi is a good default. A new
+analysis project can add R, reticulate, Python, and Python `tdt` explicitly:
+
+```{sh, eval = FALSE}
+pixi init tdt-analysis
+cd tdt-analysis
+pixi add r-base r-reticulate
+pixi add python
+pixi add --pypi "tdt>=0.7.3"
+pixi run R
+```
+
+If you want reticulate to use the Python executable from the active Pixi
+environment, configure that before Python is initialized in a fresh R session:
+
+```{r, eval = FALSE}
+reticulate::use_python(Sys.which("python"), required = TRUE)
+library(tdtr)
+tdt_config(initialize = TRUE)
+```
+
+When working inside this repository, use the project environment:
+
+```{sh, eval = FALSE}
+pixi run R
+```
+
 ```{r}
 cfg <- tdt_config(initialize = TRUE)
 
@@ -38,7 +65,7 @@ list(
 ```
 
 Reticulate chooses and initializes Python once per R session. Configure Python,
-if needed, before calling `read_block()`.
+if needed, before calling `tdt_config(initialize = TRUE)` or `read_block()`.
 
 ## Read The Example Block
 
