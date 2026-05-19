@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Validate release version
         env:
@@ -91,8 +92,10 @@ jobs:
             git commit -m "Release v$version"
           fi
           git tag -a "v$version" -m "tdtr $version"
-          git push origin HEAD:main
-          git push origin "v$version"
+          auth_header=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$auth_header"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin "v$version"
 
       - name: Create GitHub release
         env:
