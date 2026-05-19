@@ -27,12 +27,14 @@ jobs:
           fetch-depth: 0
 
       - name: Validate release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "Run releases from the main branch." >&2
             exit 1
           fi
-          version="${{ inputs.version }}"
+          version="$RELEASE_VERSION"
           case "$version" in
             *[!0-9.]* | *.*.*.* | .* | *. | *..*)
               echo "Invalid release version: $version" >&2
@@ -55,7 +57,9 @@ jobs:
           use-public-rspm: true
 
       - name: Set release version
-        run: Rscript scripts/set-release-version.R "${{ inputs.version }}"
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: Rscript scripts/set-release-version.R "$RELEASE_VERSION"
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
