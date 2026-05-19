@@ -1,0 +1,43 @@
+Experiment: VidOverlay
+Subject: Subject1
+User: Mr_TDT
+Date: 11/15/2021
+Time: 9:49:41am
+
+Object ID : RZ10x(1) - RZn Processor
+ Rate     : 6103.5 Hz
+ Store ID : Tick
+
+Object ID : Cam(1) - Camera Device
+ Store ID : Cam1
+  Source  : Value change
+
+Object ID : FibPho1 - Fiber Photometry
+ Store ID : 405A
+  Format  : Float-32
+  Scale   : Unity
+  Rate    : 1000.0 Hz
+ Store ID : 465A
+  Format  : Float-32
+  Scale   : Unity
+  Rate    : 1000.0 Hz
+ Store ID : Fi1i
+  Mode    : Single scalar
+  Format  : Float-32
+  Scale   : Unity
+  Pre Cap : 0.00 ms
+ Store ID : Fi1r
+  Format  : Float-32
+  Scale   : Unity
+  Rate    : 6103.5 Hz
+
+
+Flat Listing:
+StoreID  Gizmo/Hal
+405A     FibPho1
+465A     FibPho1
+Cam1     Cam(1)
+Fi1i     FibPho1
+Fi1r     FibPho1
+Tick     RZn(1)
+

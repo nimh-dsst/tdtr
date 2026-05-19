@@ -9,7 +9,7 @@
 #'
 #' @return A list with `tank_name`, `cage_number`, `num_subjects`,
 #'   `subject_ids`, and `tank_datetime`.
-#' @export
+#' @noRd
 tdt_parse_tank_name <- function(tank_dir, tz = "UTC") {
   tdt_check_dir(as.character(tank_dir), "tank_dir")
 
@@ -64,7 +64,7 @@ tdt_parse_tank_name <- function(tank_dir, tz = "UTC") {
 #' @param tz Time zone used for parsed datetimes.
 #'
 #' @return A tibble with one row per tank.
-#' @export
+#' @noRd
 tdt_parse_tank_names <- function(tank_dirs, tz = "UTC") {
   if (!is.character(tank_dirs)) {
     rlang::abort("`tank_dirs` must be a character vector.")

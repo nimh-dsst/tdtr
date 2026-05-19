@@ -12,7 +12,8 @@ exclude_top_level <- c(
   ".Rproj.user",
   ".Rhistory",
   ".RData",
-  ".Ruserdata"
+  ".Ruserdata",
+  "data-raw"
 )
 
 entries <- list.files(source_dir, all.files = TRUE, no.. = TRUE, full.names = TRUE)

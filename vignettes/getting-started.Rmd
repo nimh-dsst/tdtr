@@ -1,0 +1,178 @@
+---
+title: "Getting Started with tdtr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with tdtr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(tdtr)
+```
+
+`tdtr` is an R interface to Tucker-Davis Technologies (TDT) tank/block data. It
+uses the Python `tdt` package through `reticulate`, then gives R users a compact
+set of functions for the common workflow:
+
+1. check the Python/TDT configuration;
+2. read a raw TDT block;
+3. inspect streams and events;
+4. collect the selected data into ordinary R objects.
+
+## Check The Backend
+
+Loading `tdtr` declares its Python requirement through `reticulate`. Before
+starting an analysis, confirm that Python and `tdt` resolve in the current R
+session.
+
+```{r}
+cfg <- tdt_config(initialize = TRUE)
+
+list(
+  reticulate = cfg$reticulate,
+  tdt_available = cfg$tdt_available,
+  python_version = as.character(cfg$python$version)
+)
+```
+
+Reticulate chooses and initializes Python once per R session. Configure Python,
+if needed, before calling `read_block()`.
+
+## Read The Example Block
+
+The package includes one small raw TDT block from the official TDT example data.
+It is stored as TDT files, not as pre-collected R data.
+
+```{r}
+example_path <- tdtr_example_block_path()
+
+list(
+  block = basename(example_path),
+  files = list.files(example_path, pattern = "\\.(tsq|tev|Tbk|Tdx|tin|tnt)$")
+)
+```
+
+Read the first five seconds. `read_block()` returns a Python-backed object, so
+large stream arrays are not copied into R just because the block was opened.
+
+```{r}
+block <- read_block(
+  example_path,
+  evtype = c("epocs", "streams"),
+  t1 = 0,
+  t2 = 5,
+  verbose = 0
+)
+
+class(block)
+```
+
+Inspect the block without printing the local library path.
+
+```{r}
+info <- block_info(block)
+
+list(
+  blockname = info$blockname,
+  duration = as.character(info$duration),
+  streams = stream_names(block),
+  epocs = epoc_names(block)
+)
+```
+
+`summary()` gives a compact stream overview.
+
+```{r}
+summary(block)$streams
+```
+
+The example contains three streams:
+
+- `_405A` and `_465A`, lower-rate single-channel fiber photometry streams;
+- `Fi1r`, a higher-rate raw/reference stream.
+
+It also contains two event stores:
+
+- `Cam1`, camera frame events;
+- `Tick`, one-second tick events.
+
+## Work With Events
+
+Events collect into a tibble with one row per event interval.
+
+```{r}
+events <- collect_epocs(block)
+head(events)
+```
+
+Filter by store when you only need one event source.
+
+```{r}
+ticks <- collect_epocs(block, store = "Tick")
+ticks
+```
+
+Events use seconds relative to block start. You can build analysis windows from
+event onsets with `ranges_from_epocs()`.
+
+```{r}
+ranges_from_epocs(ticks, pre = -0.25, post = 0.75)
+```
+
+## Work With Streams
+
+Collect one selected stream when you want signal values in R.
+
+```{r}
+signal <- collect_stream(block, "_465A")
+
+dim(signal)
+head(signal)
+```
+
+Stream matrices are always samples by channels.
+
+```{r}
+c(samples = nrow(signal), channels = ncol(signal))
+```
+
+Use `include_time = TRUE` when you want sample times alongside the data.
+
+```{r}
+signal_with_time <- collect_stream(
+  block,
+  "_465A",
+  as = "list",
+  include_time = TRUE
+)
+
+head(signal_with_time$time)
+head(signal_with_time$data)
+```
+
+For small or bounded views, a tibble can be convenient.
+
+```{r}
+as_tibble_stream(block, "_465A", max_rows = 8)
+```
+
+Avoid turning long high-frequency streams into large tibbles by accident. Use a
+time window, downsampling, or `max_rows` for table views.
+
+```{r}
+as_tibble_stream(
+  block,
+  "Fi1r",
+  window = c(1, 1.01),
+  max_rows = 8
+)
+```
+
+## Where To Go Next
+
+The high-level interface is intentionally focused on common inspect-and-collect
+workflows. When you need reader controls that map directly to Python `tdt`,
+read-time store filtering, large-block memory checks, save/reload guidance, or
+direct access to live Python objects, see the advanced usage vignette.

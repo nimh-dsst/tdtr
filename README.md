@@ -35,18 +35,31 @@ pixi run document
 pixi run check
 ```
 
+Optional developer scripts can download the official TDT example data and
+profile collection behavior:
+
+```sh
+pixi run Rscript scripts/download_tdt_demo_data.R
+pixi run Rscript scripts/profile_tdt_demo_collect.R
+```
+
 ## Basic use
 
 ```r
 library(tdtr)
 
-block <- read_block("/path/to/TDT/block")
-stream_names(block)
+example_path <- tdtr_example_block_path()
+block <- read_block(example_path, t1 = 0, t2 = 5)
 
-events <- collect_epocs(block)
-signal <- collect_stream(block, "Wav1")
+stream_names(block)
+collect_epocs(block, store = "Tick")
+collect_stream(block, "_465A")
 ```
 
 The implementation is being realigned around generic TDT functionality. Lab-
 specific extraction workflows, Synapse API work, and native R binary parsing are
 out of scope.
+
+See the "Getting Started with tdtr" vignette for the R-friendly workflow and
+"Advanced Usage: reticulate-backed TDT Workflows" for reticulate-specific
+behavior, persistence, copying constraints, reader controls, and profiling.

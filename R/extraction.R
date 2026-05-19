@@ -55,7 +55,7 @@ tdt_expected_subject_files <- function(subject_dir, write_pickle = TRUE, write_c
 #' @param reason Human-readable reason.
 #'
 #' @return The marker path, invisibly.
-#' @export
+#' @noRd
 tdt_mark_do_not_use <- function(tank_dir, reason) {
   tdt_check_dir(tank_dir, "tank_dir")
   if (!dir.exists(tank_dir)) {
@@ -84,7 +84,7 @@ tdt_mark_do_not_use <- function(tank_dir, reason) {
 #' @param write_csv If `TRUE`, write formatted stream CSV files.
 #'
 #' @return A one-row tibble describing the extraction.
-#' @export
+#' @noRd
 tdt_write_stream_set <- function(block = NULL,
                                  subject_dir,
                                  streams,
@@ -173,8 +173,7 @@ tdt_write_stream_set <- function(block = NULL,
 #' @param stream_map Subject stream mapping. For multi-subject tanks, use
 #'   entries named `First` and `Second`; each entry must contain `ttl_stream`,
 #'   `iso_stream`, and `exp_stream`.
-#' @param block Optional pre-read TDT block object. If omitted, the function
-#'   calls [tdt_read_block()].
+#' @param block Optional pre-read TDT block object.
 #' @param overwrite If `TRUE`, overwrite existing output files.
 #' @param num_of_points Number of samples per exported CSV row.
 #' @param write_pickle If `TRUE`, write Python stream objects as pickle files.
@@ -183,7 +182,7 @@ tdt_write_stream_set <- function(block = NULL,
 #'   lengths do not match.
 #'
 #' @return A tibble with one row per subject.
-#' @export
+#' @noRd
 tdt_extract_tank <- function(tank_dir,
                              output_dir,
                              stream_map,
@@ -256,11 +255,11 @@ tdt_extract_tank <- function(tank_dir,
 #' @param tank_dirs Character vector of TDT tank/block directories.
 #' @param output_dirs Output directory or directories. A single value is reused
 #'   for all tanks.
-#' @param stream_map Subject stream mapping passed to [tdt_extract_tank()].
-#' @param ... Additional arguments passed to [tdt_extract_tank()].
+#' @param stream_map Subject stream mapping.
+#' @param ... Additional arguments.
 #'
 #' @return A tibble with one row per subject.
-#' @export
+#' @noRd
 tdt_extract_tanks <- function(tank_dirs, output_dirs, stream_map, ...) {
   if (!is.character(tank_dirs) || length(tank_dirs) == 0) {
     rlang::abort("`tank_dirs` must be a non-empty character vector.")

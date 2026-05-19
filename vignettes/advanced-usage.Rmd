@@ -1,0 +1,277 @@
+---
+title: "Advanced Usage: reticulate-backed TDT Workflows"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced Usage: reticulate-backed TDT Workflows}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(tdtr)
+```
+
+This vignette is for workflows where the getting-started interface is not
+enough: large recordings, direct Python `tdt` reader controls, live Python
+objects, event-aligned reads, and memory diagnostics.
+
+```{r}
+example_path <- tdtr_example_block_path()
+```
+
+## Python State And Saving
+
+Since TDT data are read using Python under the hood, there are some details to
+consider when saving analysis state. `read_block()` returns a `tdt_block_py`
+object by default. This object is a small R handle to a live Python `tdt` object
+in the current R session. In this context, "handle" means the R object points to
+data managed by Python. It does not mean all of the underlying stream arrays are
+stored inside the R object.
+
+That design is useful because it avoids copying every stream into R when you
+only want to inspect names, metadata, or a bounded subset. It also means ordinary
+R save functions should not be used as the durable record of a Python-backed
+block. Saving the handle does not save the associated Python session.
+
+A durable workflow has two parts:
+
+1. save the path and read parameters needed to recreate the Python-backed block;
+2. save explicitly collected R objects when you need durable analysis data.
+
+```{r}
+read_plan <- list(
+  block_path = example_path,
+  args = list(
+    evtype = c("epocs", "streams"),
+    t1 = 0,
+    t2 = 5,
+    verbose = 0
+  )
+)
+
+block <- do.call(
+  read_block,
+  c(list(block_path = read_plan$block_path), read_plan$args)
+)
+
+class(block)
+stream_names(block)
+epoc_names(block)
+summary(block)$streams
+```
+
+Save a read plan or a collected subset, not the live Python-backed handle as
+long-term state.
+
+```{r, eval = FALSE}
+saveRDS(read_plan, "tdt-read-plan.rds")
+
+selected <- collect_block(block, stores = c("_405A", "_465A"))
+saveRDS(selected, "selected-tdt-block.rds")
+```
+
+## Python-side Processing
+
+For Python-backed objects, `stream()` returns a live Python stream object. The
+stream's `data` field is a NumPy array. An advanced R/Python user can do work on
+that array in Python and return only a small result to R.
+
+```{r}
+py_stream <- stream(block, "_465A")
+py_data <- py_stream$data
+
+class(py_data)
+```
+
+This example computes small quality-control summaries in Python. The full trace
+stays on the Python side; only the small dictionary of results crosses back into
+R.
+
+```{r}
+reticulate::py_run_string("
+import numpy as np
+
+def qc_trace(x):
+    x = np.asarray(x)
+    return {
+        'n_samples': int(x.shape[0]),
+        'mean': float(np.nanmean(x)),
+        'sd': float(np.nanstd(x)),
+        'p01': float(np.nanpercentile(x, 1)),
+        'p99': float(np.nanpercentile(x, 99)),
+    }
+")
+
+reticulate::py$qc_trace(py_data)
+```
+
+This pattern is useful when the next few operations are naturally NumPy/Python
+operations, or when returning a small result to R avoids copying a large array.
+
+## Reader Controls
+
+`read_block()` exposes common `tdt.read_block()` controls directly. This
+example uses `evtype`, `channel`, `t1`, and `t2`; the event-aligned example
+below uses `ranges`. Other controls, including `store`, `headers`, `nodata`,
+`sortname`, and export options, are documented in `?read_block_py` and are
+forwarded to Python `tdt` rather than reimplemented in R.
+
+```{r}
+bounded <- read_block(
+  example_path,
+  evtype = "streams",
+  channel = 1,
+  t1 = 1,
+  t2 = 3,
+  verbose = 0
+)
+
+stream_names(bounded)
+summary(bounded)$streams
+```
+
+Extra keyword arguments can be passed through `...` when the underlying Python
+package supports an option that the R wrapper has not named explicitly.
+
+## Store Filters And Names
+
+Read-time store filtering is delegated to Python `tdt`. This means store-name
+behavior can expose details of the underlying Python package. In this packaged
+fixture, filtering to `Fi1r` works as expected.
+
+```{r}
+fi1r_only <- read_block(
+  example_path,
+  evtype = "streams",
+  store = "Fi1r",
+  t1 = 1,
+  t2 = 3,
+  verbose = 0
+)
+
+stream_names(fi1r_only)
+summary(fi1r_only)$streams
+```
+
+The same read-time filter does not currently select the leading-underscore
+photometry stores by the stream names returned after a general read.
+
+```{r}
+photometry_filter <- read_block(
+  example_path,
+  evtype = "streams",
+  store = "_465A",
+  t1 = 1,
+  t2 = 3,
+  verbose = 0
+)
+
+stream_names(photometry_filter)
+```
+
+That behavior should be visible rather than hidden. Until the wrapper provides a
+higher-level normalization for this case, use a bounded read and then select the
+stream by name at collection time.
+
+```{r}
+photometry <- collect_stream(
+  bounded,
+  "_465A",
+  as = "list",
+  include_time = TRUE
+)
+
+list(
+  samples = nrow(photometry$data),
+  channels = ncol(photometry$data),
+  first_times = head(photometry$time, 3)
+)
+```
+
+## Explicit Collection
+
+Collection is the point where data become ordinary R objects.
+
+```{r}
+signal <- collect_stream(bounded, "_465A", as = "list", include_time = TRUE)
+
+list(
+  samples = nrow(signal$data),
+  channels = ncol(signal$data),
+  first_times = head(signal$time, 3),
+  r_size = format(utils::object.size(signal$data), units = "auto")
+)
+```
+
+Use `collect_block()` when you want a durable R object for a selected subset.
+The collected object no longer depends on a live Python session.
+
+```{r}
+selected <- collect_block(bounded, stores = "_465A")
+
+class(selected)
+summary(selected)$streams
+```
+
+## Event-aligned Reads
+
+Event tables can be translated to the `2 x N` range matrix expected by Python
+`tdt`. This lets you define event windows in R and still reduce the read before
+collecting stream samples.
+
+```{r}
+ticks <- collect_epocs(block, store = "Tick")
+ranges <- ranges_from_epocs(head(ticks, 2), pre = -0.1, post = 0.2)
+ranges
+```
+
+```{r}
+aligned <- read_block(
+  example_path,
+  evtype = "streams",
+  ranges = ranges,
+  verbose = 0
+)
+
+summary(aligned)$streams
+```
+
+## Profiling Before Scaling Up
+
+Use `profile_tdt_memory()` on a bounded read before trying to load a large
+recording. It profiles the read, metadata accessors, optional summary, optional
+stream collection, and event collection.
+
+```{r}
+profile_tdt_memory(
+  example_path,
+  evtype = c("epocs", "streams"),
+  t1 = 0,
+  t2 = 5,
+  stream = "_465A",
+  verbose = 0
+)
+```
+
+Interpret the result as a local diagnostic, not as exact total process memory.
+The helper uses `Rprofmem()` for R allocations and Python `tracemalloc` for
+Python allocations. Those tools do not perfectly measure every allocation made
+by R, reticulate, NumPy, Python C extensions, or the operating system. Treat the
+output as a way to compare alternative reads on the same machine and in the same
+session. Differences smaller than roughly 10-30% should be treated cautiously;
+large differences are usually informative.
+
+The expected shape is:
+
+- `metadata_accessors` stays small because it reads names and metadata;
+- `collect_stream:*` allocates R memory because it intentionally copies selected
+  stream samples into R;
+- the Python peak column is useful context, but it is not the same as total
+  resident memory for the R process.
+
+Use the high-level workflow when selected data fit comfortably in memory and the
+downstream analysis expects matrices or tibbles. Use the Python-backed workflow
+when you need to inspect first, reduce at read time, keep large arrays on the
+Python side, or persist a reproducible read plan separately from collected R
+analysis data.

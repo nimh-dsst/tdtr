@@ -5,5 +5,9 @@
 .DS_Store
 .pixi
 external/
+data-raw/tdt-demo/
+data-raw/tdt-demo-profile/
 *.Rcheck
 tdtr_*.tar.gz
+docs/*pdf
+pixi.lock

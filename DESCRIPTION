@@ -15,11 +15,14 @@ Depends:
     R (>= 4.1.0)
 Imports:
     jsonlite,
-    reticulate,
+    reticulate (>= 1.41.0),
     rlang,
     tibble
 Suggests:
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0),
     withr
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

@@ -5,6 +5,8 @@
 ^\.pixi/
 ^external$
 ^external/
+^data-raw$
+^data-raw/
 ^pixi\.lock$
 ^pixi\.toml$
 ^README\.Rmd$

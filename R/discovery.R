@@ -8,7 +8,7 @@
 #'   `DO_NOT_USE.json`.
 #'
 #' @return A tibble with `tank_dir`, `tank_name`, `n_tsq`, and `do_not_use`.
-#' @export
+#' @noRd
 tdt_discover_tanks <- function(path, ignore_do_not_use = FALSE) {
   tdt_check_dir(path, "path")
   if (!dir.exists(path)) {
@@ -53,7 +53,7 @@ tdt_discover_tanks <- function(path, ignore_do_not_use = FALSE) {
 #' @param cohort Optional cohort directory name used to filter results.
 #'
 #' @return A character vector of completed tank directories.
-#' @export
+#' @noRd
 tdt_completed_tanks <- function(path, cohort = NULL) {
   tdt_check_dir(path, "path")
 

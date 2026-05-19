@@ -5,7 +5,7 @@
 #' @param num_of_points Number of samples per exported row.
 #'
 #' @return A numeric vector of row-start timepoints in seconds.
-#' @export
+#' @noRd
 tdt_calc_timepoints <- function(n_points, fs, num_of_points = 128) {
   if (!is.numeric(n_points) || length(n_points) != 1 || is.na(n_points)) {
     rlang::abort("`n_points` must be a single number.")
@@ -37,7 +37,7 @@ tdt_calc_timepoints <- function(n_points, fs, num_of_points = 128) {
 #'
 #' @return A data frame with block/event metadata and columns `D0` through
 #'   `D{num_of_points - 1}`.
-#' @export
+#' @noRd
 tdt_format_stream <- function(data_info, stream, num_of_points = 128) {
   if (!is.numeric(num_of_points) || length(num_of_points) != 1 ||
       is.na(num_of_points) || num_of_points <= 0) {
@@ -100,7 +100,7 @@ tdt_format_stream <- function(data_info, stream, num_of_points = 128) {
 #' @param stream A stream object or a character stream name.
 #'
 #' @return A single character string.
-#' @export
+#' @noRd
 tdt_stream_label <- function(stream) {
   if (is.character(stream) && length(stream) == 1) {
     return(stream)
@@ -115,7 +115,7 @@ tdt_stream_label <- function(stream) {
 #'
 #' @return A named integer vector of stream lengths, invisibly. Throws an error
 #'   of class `tdt_stream_length_mismatch` if lengths differ.
-#' @export
+#' @noRd
 tdt_validate_stream_lengths <- function(streams) {
   tdt_validate_stream_config(streams)
 
