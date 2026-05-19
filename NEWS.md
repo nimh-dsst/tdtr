@@ -1,4 +1,4 @@
-# tdtr 0.0.3
+# tdtr 0.0.4
 
 Initial reticulate-backed package direction.
 
