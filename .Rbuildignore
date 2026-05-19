@@ -1,5 +1,7 @@
 ^\.git$
 ^\.gitignore$
+^\.github$
+^\.github/
 ^\.lintr$
 ^\.pixi$
 ^\.pixi/
@@ -11,4 +13,5 @@
 ^pixi\.toml$
 ^README\.Rmd$
 ^scripts$
+^tdtr_.*\.tar\.gz$
 ^tdtr\.Rproj$

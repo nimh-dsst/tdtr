@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: R package version to release, for example 0.0.1
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      RETICULATE_PYTHON: managed
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate release version
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Run releases from the main branch." >&2
+            exit 1
+          fi
+          version="${{ inputs.version }}"
+          case "$version" in
+            *[!0-9.]* | *.*.*.* | .* | *. | *..*)
+              echo "Invalid release version: $version" >&2
+              exit 1
+              ;;
+          esac
+          if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Release version must have the form x.y.z." >&2
+            exit 1
+          fi
+          if git rev-parse "v$version" >/dev/null 2>&1; then
+            echo "Tag v$version already exists." >&2
+            exit 1
+          fi
+
+      - name: Set release version
+        run: Rscript scripts/set-release-version.R "${{ inputs.version }}"
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::rcmdcheck
+            any::roxygen2
+          needs: check
+
+      - name: Regenerate documentation
+        run: Rscript -e 'roxygen2::roxygenise()'
+
+      - name: Build source package
+        run: R CMD build .
+
+      - name: Check source package
+        run: |
+          tarball=$(ls tdtr_*.tar.gz)
+          Rscript -e 'rcmdcheck::rcmdcheck(path = commandArgs(TRUE)[[1]], args = c("--no-manual"), error_on = "warning", check_dir = "check")' "$tarball"
+
+      - name: Commit and tag release
+        run: |
+          version="${{ inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add DESCRIPTION NEWS.md NAMESPACE man
+          if ! git diff --cached --quiet; then
+            git commit -m "Release v$version"
+          fi
+          git tag -a "v$version" -m "tdtr $version"
+          git push origin HEAD:main
+          git push origin "v$version"
+
+      - name: Create GitHub release
+        run: |
+          version="${{ inputs.version }}"
+          tarball="tdtr_${version}.tar.gz"
+          gh release create "v$version" "$tarball" \
+            --title "tdtr $version" \
+            --notes "Automated tdtr source package release built and checked by GitHub Actions."

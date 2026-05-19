@@ -1,5 +1,9 @@
 # tdtr
 
+[![R-CMD-check](https://github.com/nimh-dsst/tdtr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nimh-dsst/tdtr/actions/workflows/R-CMD-check.yaml)
+[![R-universe version](https://nimh-dsst.r-universe.dev/tdtr/badges/version)](https://nimh-dsst.r-universe.dev/tdtr)
+[![R-universe status](https://nimh-dsst.r-universe.dev/tdtr/badges/checks)](https://nimh-dsst.r-universe.dev/tdtr)
+
 `tdtr` is an R package for working with Tucker-Davis Technologies (TDT)
 tank/block data from R. It reads raw TDT data with Python's `tdt` package
 through `reticulate`, then provides R-friendly accessors, summaries, event
@@ -21,12 +25,29 @@ Out of scope for the core package: Synapse API work, live acquisition, native R
 binary parsing, lab-specific tank naming rules, and broad tidyverse dependency
 stacks.
 
-## Quick start
+## Installation
 
-Use the getting-started vignette to get started.
+Install the release build from the NIMH-DSST R-universe:
 
 ```r
-vignette("getting-started", package = "tdtr")
+install.packages(
+  "tdtr",
+  repos = c(
+    nimhdsst = "https://nimh-dsst.r-universe.dev",
+    CRAN = "https://cloud.r-project.org"
+  )
+)
+```
+
+If you prefer `pak`, use the same repository configuration:
+
+```r
+install.packages("pak")
+options(repos = c(
+  nimhdsst = "https://nimh-dsst.r-universe.dev",
+  CRAN = "https://cloud.r-project.org"
+))
+pak::pkg_install("tdtr")
 ```
 
 ## Python backend
@@ -40,21 +61,26 @@ reticulate::py_require("tdt>=0.7.3")
 
 Python is not initialized just because the R package is attached, so users can
 still configure their Python environment before the first Python-backed call.
-When Python `tdt` cannot be used, backend entry points fail with explicit
-diagnostics.
+For ordinary users, reticulate can create and manage a Python environment that
+contains `tdt>=0.7.3` when Python is first initialized. If a user forces a
+specific Python environment with reticulate, Conda, Pixi, or environment
+variables, then that Python environment must already provide `tdt>=0.7.3`.
 
-For a local Python environment:
+Backend entry points fail with explicit diagnostics when Python `tdt` cannot be
+used.
 
-```sh
-python -m pip install "tdt>=0.7.3"
-```
+## Quick start
 
-For development in this repository:
+See the hosted getting-started vignette:
 
-```sh
-pixi run test
-pixi run document
-pixi run check
+<https://nimh-dsst.r-universe.dev/tdtr/doc/getting-started.html>
+
+After installation:
+
+```r
+library(tdtr)
+
+tdt_config(initialize = TRUE)
 ```
 
 ## Basic use
@@ -95,10 +121,63 @@ original TDT store ID (`465A`) for that case.
 
 ## Documentation
 
-- `vignette("getting-started", package = "tdtr")` covers the R-friendly
-  inspect-and-collect workflow, including Python configuration with Pixi.
-- `vignette("advanced-usage", package = "tdtr")` covers reticulate-backed
+- [Getting started](https://nimh-dsst.r-universe.dev/tdtr/doc/getting-started.html)
+  covers the R-friendly inspect-and-collect workflow.
+- [Advanced usage](https://nimh-dsst.r-universe.dev/tdtr/doc/advanced-usage.html)
+  covers reticulate-backed
   workflows, save/reload behavior, Python-side processing, reader controls,
   store-filter naming behavior, and memory profiling.
+- If the package was installed from a built source package that includes
+  vignettes, the same documents are available from R with
+  `vignette("getting-started", package = "tdtr")` and
+  `vignette("advanced-usage", package = "tdtr")`.
+
+## Development
+
+This repository uses Pixi for the local development environment:
+
+```sh
+pixi run R
+```
+
+Inside R, use the source tree directly during active development:
+
+```r
+pkgload::load_all()
+```
+
+This is the same source-loading workflow exposed by `devtools::load_all()` if
+you also have devtools installed.
+
+Run the standard checks before handing off substantive changes:
+
+```sh
+pixi run document
+pixi run test
+pixi run check
+git diff --check
+```
+
+Local source-tree sessions do not automatically expose package vignettes through
+`vignette()`. To test installed-package vignette behavior, build and install a
+source package with vignettes:
+
+```sh
+pixi run R CMD build .
+pixi run R CMD INSTALL tdtr_*.tar.gz
+```
+
+## Releases
+
+Releases are created by GitHub Actions. To publish a patch release, run the
+`Release` workflow on `main` with the desired version, for example `0.0.1`. The
+workflow updates `DESCRIPTION` and `NEWS.md`, regenerates documentation, builds
+and checks the source package with vignettes, commits the release version, tags
+it, and creates the GitHub Release with the source tarball attached.
+
+```sh
+gh workflow run release.yaml --ref main -f version=0.0.1
+```
+
 - [AGENTS.md](AGENTS.md) records implementation guardrails for future coding
   work in this repository.

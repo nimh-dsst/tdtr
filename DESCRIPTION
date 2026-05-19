@@ -9,6 +9,8 @@ Description: Provides an R interface for reading Tucker-Davis Technologies
     including Python-backed wrappers and explicit helpers for collecting data
     into ordinary R objects for downstream analysis.
 License: MIT + file LICENSE
+URL: https://github.com/nimh-dsst/tdtr, https://nimh-dsst.r-universe.dev/tdtr
+BugReports: https://github.com/nimh-dsst/tdtr/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Depends:

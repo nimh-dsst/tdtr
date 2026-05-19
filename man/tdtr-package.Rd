@@ -11,6 +11,15 @@ Python's \code{tdt} package with reticulate, including Python-backed wrappers an
 explicit helpers for collecting data into ordinary R objects for downstream
 analysis.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/nimh-dsst/tdtr}
+  \item \url{https://nimh-dsst.r-universe.dev/tdtr}
+  \item Report bugs at \url{https://github.com/nimh-dsst/tdtr/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: John Lee \email{johnleenimh@gmail.com}
 
